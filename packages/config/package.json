@@ -1,0 +1,10 @@
+{
+  "name": "@soneh/config",
+  "version": "0.0.1",
+  "private": true,
+  "main": "index.js",
+  "devDependencies": {
+    "typescript": "^5.4.5",
+    "eslint": "^8.57.0"
+  }
+}

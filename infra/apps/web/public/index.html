@@ -1,0 +1,86 @@
+<!doctype html>
+<html lang="pt-BR">
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Soneh — Painel Dev</title>
+<style>
+  :root{--fg:#0f172a;--muted:#64748b;--ok:#16a34a;--err:#dc2626;--bg:#f8fafc}
+  *{box-sizing:border-box} body{font-family:system-ui,-apple-system,Segoe UI,Roboto,Ubuntu; margin:0; background:var(--bg); color:var(--fg)}
+  header{padding:16px 20px; background:#fff; border-bottom:1px solid #e5e7eb; position:sticky; top:0}
+  main{max-width:900px; margin:24px auto; padding:0 16px}
+  h1{font-size:20px; margin:0 0 4px}
+  .muted{color:var(--muted); font-size:14px}
+  .row{display:flex; gap:8px; flex-wrap:wrap; margin:12px 0}
+  button,input[type=checkbox]{cursor:pointer}
+  button{padding:8px 12px; border:1px solid #e5e7eb; border-radius:10px; background:#fff}
+  button.primary{background:#111827; color:#fff; border-color:#111827}
+  .card{background:#fff; border:1px solid #e5e7eb; border-radius:12px; padding:14px; margin:10px 0; display:flex; align-items:center; justify-content:space-between; gap:12px}
+  .right{display:flex; align-items:center; gap:10px}
+  .chip{font-size:12px; padding:4px 8px; border-radius:999px; border:1px solid #e5e7eb; background:#f9fafb}
+  .toast{position:fixed; right:16px; bottom:16px; background:#111827; color:#fff; padding:10px 12px; border-radius:10px; opacity:0; transform:translateY(12px); transition:all .2s}
+  .toast.show{opacity:1; transform:none}
+</style>
+<header>
+  <h1>Soneh — Painel Dev</h1>
+  <div class="muted">Lista devices (GET /api/devices) • Comando (POST /api/devices/:id/command)</div>
+</header>
+<main>
+  <div class="row">
+    <button id="btn-reload" class="primary">Recarregar lista</button>
+    <button id="btn-create">Criar device demo</button>
+  </div>
+  <div id="list"></div>
+</main>
+<div id="toast" class="toast"></div>
+<script>
+const API = '/api';
+
+function toast(msg){ const t=document.getElementById('toast'); t.textContent=msg; t.classList.add('show'); setTimeout(()=>t.classList.remove('show'), 2000); }
+
+async function listDevices(){
+  const r = await fetch(`${API}/devices`); const arr = await r.json();
+  const list = document.getElementById('list'); list.innerHTML='';
+  if(!Array.isArray(arr) || arr.length===0){ list.innerHTML='<div class="muted">Nenhum device ainda.</div>'; return; }
+  for(const d of arr){
+    const el = document.createElement('div'); el.className='card';
+    el.innerHTML = `
+      <div>
+        <div><strong>${d.name}</strong> <span class="chip">${d.type}</span></div>
+        <div class="muted">ID: ${d.id} · Projeto: ${d.projectId}</div>
+      </div>
+      <div class="right">
+        <label class="muted">Relay</label>
+        <input type="checkbox" ${d.lastState?.relay ? 'checked':''} data-id="${d.id}" />
+        <button data-cmd="on"  data-id="${d.id}">Ligar</button>
+        <button data-cmd="off" data-id="${d.id}">Desligar</button>
+      </div>`;
+    list.appendChild(el);
+  }
+  // binds
+  list.querySelectorAll('button[data-id]').forEach(b=>{
+    b.addEventListener('click', ()=>sendRelay(b.dataset.id, b.dataset.cmd==='on'));
+  });
+  list.querySelectorAll('input[type=checkbox][data-id]').forEach(ch=>{
+    ch.addEventListener('change', ()=>sendRelay(ch.dataset.id, ch.checked));
+  });
+}
+
+async function createDemo(){
+  const payload = { projectId:'proj1', name:'Sala', type:'RELAY' };
+  const r = await fetch(`${API}/devices`, { method:'POST', headers:{'content-type':'application/json'}, body: JSON.stringify(payload) });
+  if(!r.ok){ toast('Falha ao criar device'); return; }
+  const d = await r.json(); toast(`Criado ${d.id}`); listDevices();
+}
+
+async function sendRelay(id, value){
+  const r = await fetch(`${API}/devices/${id}/command`, { method:'POST', headers:{'content-type':'application/json'}, body: JSON.stringify({action:'relay', value}) });
+  if(!r.ok){ toast('Falha ao enviar comando'); return; }
+  const j = await r.json(); toast('Comando enviado');
+  console.log('cmd topic:', j.topic);
+}
+
+document.getElementById('btn-reload').onclick = listDevices;
+document.getElementById('btn-create').onclick = createDemo;
+listDevices();
+</script>
+</html>

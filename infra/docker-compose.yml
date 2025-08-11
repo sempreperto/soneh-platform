@@ -1,0 +1,54 @@
+version: "3.9"
+
+services:
+  emqx:
+    image: emqx/emqx:5.3.2
+    container_name: soneh-emqx
+    environment:
+      EMQX_ALLOW_ANONYMOUS: "true"
+    ports:
+      - "1883:1883"
+      - "18083:18083"
+    restart: unless-stopped
+
+  api:
+    container_name: soneh-api
+    build:
+      context: ..
+      dockerfile: apps/api/Dockerfile
+    environment:
+      NODE_ENV: production
+      PORT: 3001
+      MQTT_URL: ${MQTT_URL:-mqtt://emqx:1883}
+      MQTT_USERNAME: ${MQTT_USERNAME:-saas_api}
+      MQTT_PASSWORD: ${MQTT_PASSWORD:-strongsecret}
+      MQTT_NAMESPACE: ${MQTT_NAMESPACE:-soneh}
+    depends_on:
+      - emqx
+    ports:
+      - "3001:3001"
+    restart: unless-stopped
+
+  web:
+    container_name: soneh-web
+    build:
+      context: ..
+      dockerfile: apps/web/Dockerfile
+    depends_on:
+      - api
+    ports:
+      - "3000:80"
+    restart: unless-stopped
+
+  caddy:
+    image: caddy:2-alpine
+    container_name: soneh-caddy
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+    depends_on:
+      - api
+      - web
+    ports:
+      - "80:80"
+      - "443:443"
+    restart: unless-stopped

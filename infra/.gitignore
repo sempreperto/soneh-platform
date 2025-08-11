@@ -1,0 +1,10 @@
+node_modules/
+.env
+.env.*
+apps/**/.env*
+.pnpm-store/
+.turbo/
+dist/
+.next/
+apps/**/dist/
+apps/**/.next/

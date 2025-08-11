@@ -1,0 +1,31 @@
+:80 {
+  # --- SSE primeiro: sem encode, com flush e sem timeouts ociosos ---
+  @sse path /api/devices/stream
+  handle @sse {
+    # garante que nenhum proxy re-buffere ou comprima
+    header {
+      -Content-Encoding
+    }
+    reverse_proxy api:3001 {
+      flush_interval 100ms
+      transport http {
+        read_idle_timeout 0
+        write_idle_timeout 0
+      }
+    }
+  }
+
+  # --- Demais rotas agrupadas em 'route' com compressão ---
+  route {
+    encode gzip zstd
+
+    @api path /api/*
+    handle @api {
+      reverse_proxy api:3001
+    }
+
+    handle {
+      reverse_proxy web:80
+    }
+  }
+}

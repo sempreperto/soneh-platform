@@ -1,0 +1,110 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+  output   = "../../../node_modules/.prisma/client"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ENUMS
+enum Role {
+  OWNER
+  ADMIN
+  MEMBER
+  VIEWER
+}
+
+enum DeviceType {
+  RELAY
+  SENSOR
+  CAMERA
+}
+
+enum TwoFAType {
+  TOTP
+  WEBAUTHN
+}
+
+// MODELS
+model User {
+  id           String          @id @default(cuid())
+  email        String          @unique
+  name         String?
+  image        String?
+  googleId     String?         @unique
+  twoFAEnabled Boolean         @default(false)
+  twoFAType    TwoFAType?
+  createdAt    DateTime        @default(now())
+  updatedAt    DateTime        @updatedAt
+  projects     ProjectMember[]
+  ownedDevices Device[]        @relation("OwnerDevices")
+  OtpSecret    OtpSecret?
+  WebAuthnKey  WebAuthnKey[]
+}
+
+model OtpSecret {
+  id          String   @id @default(cuid())
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId      String   @unique
+  secret      String
+  backupCodes String // JSON array string
+}
+
+model WebAuthnKey {
+  id        String @id
+  user      User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId    String
+  credId    String @unique
+  publicKey String
+  counter   BigInt
+}
+
+model Project {
+  id          String          @id @default(cuid())
+  name        String
+  createdAt   DateTime        @default(now())
+  updatedAt   DateTime        @updatedAt
+  members     ProjectMember[]
+  devices     Device[]
+}
+
+model ProjectMember {
+  id        String   @id @default(cuid())
+  project   Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  projectId String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId    String
+  role      Role     @default(MEMBER)
+  createdAt DateTime @default(now())
+
+  @@unique([projectId, userId])
+}
+
+model Device {
+  id        String     @id @default(cuid())
+  name      String
+  type      DeviceType
+  token     String     @unique @default(cuid())
+  lastState Json?
+  online    Boolean    @default(false)
+  createdAt DateTime   @default(now())
+  updatedAt DateTime   @updatedAt
+  project   Project    @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  projectId String
+  owner     User       @relation("OwnerDevices", fields: [ownerId], references: [id])
+  ownerId   String
+  Telemetry Telemetry[]
+}
+
+model Telemetry {
+  id        String   @id @default(cuid())
+  device    Device   @relation(fields: [deviceId], references: [id], onDelete: Cascade)
+  deviceId  String
+  payload   Json
+  createdAt DateTime @default(now())
+}

@@ -1,0 +1,80 @@
+<!doctype html>
+<html lang="pt-br">
+  <head>
+    <meta charset="utf-8" />
+    <title>Soneh — Realtime</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <style>
+      body { font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Ubuntu, Cantarell, Noto Sans, Arial, "Apple Color Emoji","Segoe UI Emoji"; margin: 2rem; }
+      .row { display: flex; gap: .5rem; flex-wrap: wrap; align-items: center; margin-bottom: 1rem; }
+      input, button { padding: .5rem .75rem; font-size: 14px; }
+      button { cursor: pointer; }
+      ul { list-style: none; padding: 0; }
+      li { padding: .35rem .5rem; background: #f5f5f5; margin-bottom: .35rem; border-radius: 6px; font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace; }
+      .muted { color: #666; }
+      .ok { color: #0a7; }
+    </style>
+  </head>
+  <body>
+    <h1>Soneh — Realtime</h1>
+    <p class="muted">Escutando <code>/api/devices/stream?projectId=proj1</code> (SSE) e enviando comandos para <code>/api/devices/:id/command</code>.</p>
+
+    <div class="row">
+      <label for="dev">DEV_ID:</label>
+      <input id="dev" placeholder="ex: x6op7ppr4j" />
+      <button id="on">Relay ON</button>
+      <button id="off">Relay OFF</button>
+      <button id="ping">Publicar state fake</button>
+    </div>
+
+    <ul id="log"></ul>
+
+    <script>
+      const $log = document.getElementById('log');
+      const $dev = document.getElementById('dev');
+      const log = (msg) => {
+        const li = document.createElement('li');
+        li.textContent = msg;
+        $log.prepend(li);
+      };
+
+      // SSE
+      const es = new EventSource('/api/devices/stream?projectId=proj1');
+      es.onopen = () => log('[SSE] conectado');
+      es.onerror = () => log('[SSE] erro (verifique API)');
+      es.onmessage = (ev) => {
+        try {
+          const data = JSON.parse(ev.data);
+          log(`[state] ${data.deviceId} -> ${JSON.stringify(data.state)}`);
+        } catch {}
+      };
+
+      async function sendCmd(value) {
+        const id = $dev.value.trim();
+        if (!id) return alert('Informe DEV_ID');
+        const res = await fetch(`/api/devices/${id}/command`, {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({ action: 'relay', value })
+        });
+        const j = await res.json();
+        if (res.ok) {
+          log(`[cmd] ${id} -> relay:${value} ✅ (${j.topic})`);
+        } else {
+          log(`[cmd] erro: ${res.status} ${JSON.stringify(j)}`);
+        }
+      }
+
+      document.getElementById('on').onclick = () => sendCmd(true);
+      document.getElementById('off').onclick = () => sendCmd(false);
+
+      // botão "ping": publica um state fake via API? (não — aqui só chama EMQX direto)
+      document.getElementById('ping').onclick = async () => {
+        const id = $dev.value.trim();
+        if (!id) return alert('Informe DEV_ID');
+        // dica: no terminal, rode: docker run --rm --network host efrecon/mqtt-client pub -h localhost -p 1883 -t "soneh/proj1/DEV/state" -m '{"relay":true,"ts":1690000000}' -r
+        alert('Para "pingar", publique um state via MQTT (vide comentário no código).');
+      };
+    </script>
+  </body>
+</html>
