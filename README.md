@@ -26,3 +26,4 @@ docker compose up -d --build
 - `apps/mobile` (Expo, stub)
 - `packages/*` (ui, sdk, config)
 - `infra/` (docker-compose, Caddyfile, Prisma schema stub)
+# soneh-platform
